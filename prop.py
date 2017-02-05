@@ -9,8 +9,9 @@ N = 50
 a = numpy.zeros((N, N))
 a[N / 2, N / 2] = 1
 u = numpy.ones((N, N))
+u[:, :N / 2] = 0.5
 
-R = 50
+R = 500
 
 ahist = []
 
@@ -36,9 +37,9 @@ for r in range(R):
 
     dt = numpy.random.exponential(1.0 / rsum[-1])
 
-    r = numpy.random.rand() * rsum[-1]
+    rr = numpy.random.rand() * rsum[-1]
 
-    i = bisect.bisect_left(rsum, r)
+    i = bisect.bisect_left(rsum, rr)
 
     a[targets[i]] = 1
 
@@ -46,24 +47,93 @@ for r in range(R):
 
     dts.append(dt)
 
-    plt.imshow(a)
-    plt.show()
+    if r % 10 == 0:
+        ahist.append(a.copy())
+        plt.imshow(a, interpolation = 'NONE')
+        plt.show()
 
 #%%
 
 Xs = []
 Ys = []
 
-for i in range(len(ahist) - 1):
-    for i, j in zip(*numpy.where(a == 1)):
-        for io, jo in [(-1, 0), (0, -1), (1, 0), (0, 1)]:
-            if i + io >= N or i + io < 0:
-                ignore = True
-                break
+for t in range(len(ahist) - 1):
+    print t
+    growth = ahist[t + 1] - ahist[t]
+    
+    for i in range(N):
+        for j in range(N):
+    #for i, j in zip(*numpy.where(a == 1)):
+            neighbors = []
+            ignore = False
+            
+            for io, jo in [(-1, 0), (0, -1), (1, 0), (0, 1)]:
+                if i + io >= N or i + io < 0:
+                    ignore = True
+                    break
+    
+                if j + jo >= N or j + jo < 0:
+                    ignore = True
+                    break
+                
+                neighbors.append(ahist[t][i + io, j + jo])
+                
+            if ignore:
+                continue
+    
+            neighbors = tuple(neighbors)
+        
+        #if neighbors is not (1, 1, 1, 1):
+            Xs.append(neighbors)
+            Ys.append(growth[i, j])
+            
+    #plt.imshow(growth)
+    #plt.show()
+            
+#%%
+            
+import sklearn.linear_model
 
-            if j + jo >= N or j + jo < 0:
-                ignore = True
-                break
+lr = sklearn.svm.SVC(class_weight = 'balanced')
+lr.fit(Xs, Ys)
 
-            if a[i + io, j + jo] == 0:
-                possibilities.append((u[i + io, j + jo], (i + io, j + jo)))
+#%%
+
+for t in range(len(ahist) - 1):
+    growth = ahist[t + 1] - ahist[t]
+    
+    Xs = []
+    
+    for i in range(1, N - 1):
+        for j in range(1, N - 1):
+    #for i, j in zip(*numpy.where(a == 1)):
+            neighbors = []
+            ignore = False
+            
+            for io, jo in [(-1, 0), (0, -1), (1, 0), (0, 1)]:
+                if i + io >= N or i + io < 0:
+                    ignore = True
+                    break
+    
+                if j + jo >= N or j + jo < 0:
+                    ignore = True
+                    break
+                
+                neighbors.append(ahist[t][i + io, j + jo])
+                
+            if ignore:
+                continue
+    
+            neighbors = tuple(neighbors)
+        
+        #if neighbors is not (1, 1, 1, 1):
+            Xs.append(neighbors)
+            #Ys.append(growth[i, j])
+            
+    pgrowth = lr.predict(Xs)[:]
+    
+    pgrowth = numpy.pad(pgrowth.reshape((N - 2, N - 2)), 1, mode = 'edge')
+    
+    plt.imshow(pgrowth)
+    plt.show()
+                
